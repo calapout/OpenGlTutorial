@@ -70,16 +70,24 @@ static ShaderProgramSources ParseShader(const std::string& filepath)
     return ShaderProgramSources{ ss[0].str(), ss[1].str() };
 }
 
+/**
+ * \brief Compiles a shader using it's type and source code and returns it's id
+ * \param type Shader type
+ * \param source the source code of the shader to compile
+ * \return 0 if the compilation fails, otherwise we return the id of the shader
+ */
 static unsigned int CompileShader(unsigned int type, const std::string& source)
 {
-    unsigned int id = glCreateShader(type);
+    GlCall(unsigned int id = glCreateShader(type));
     const char* src = source.c_str();
-
+    
     GlCall(glShaderSource(id, 1, &src, nullptr));
     GlCall(glCompileShader(id));
 
     int result;
     GlCall(glGetShaderiv(id, GL_COMPILE_STATUS, &result));
+    
+    // shader didn't compiled properly
     if(result == GL_FALSE)
     {
         int length;
@@ -97,9 +105,15 @@ static unsigned int CompileShader(unsigned int type, const std::string& source)
     return id;
 }
 
+/**
+ * \brief Compile a vertex shader and a fragment shader and associate them in a program and return it's id
+ * \param vertexShader The source code of the vertexShader
+ * \param fragmentShader The source code of the fragmentShader
+ * \return the id of a program
+ */
 static unsigned int CreateShader(const std::string& vertexShader, const std::string& fragmentShader)
 {
-    unsigned int program = glCreateProgram();
+    GlCall(unsigned int program = glCreateProgram());
     unsigned int vs = CompileShader(GL_VERTEX_SHADER, vertexShader);
     unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, fragmentShader);
 
@@ -123,6 +137,11 @@ int main(void)
         return -1;
 
     /* Create a windowed mode window and its OpenGL context */
+
+    // SET OPEN GL AS 3.3.0 WITH CORE PROFILE
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
     if (!window)
     {
@@ -132,7 +151,8 @@ int main(void)
 
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
-
+    glfwSwapInterval(1);
+    
     if (glewInit() != GLEW_OK)
     {
         std::cout << "Error while initializing GLEW\n";
@@ -141,7 +161,7 @@ int main(void)
     std::cout << glGetString(GL_VERSION) << std::endl;
 
 
-
+    // contain the list of vertices position as 2D coordinate
     float positions[] = {
     	-0.5f,  -0.5f,
          0.5f,  -0.5f,
@@ -149,38 +169,77 @@ int main(void)
     	-0.5f,   0.5f,
     };
 
+    // Store which vertices we need to use to draw each triangle (3 per triangle and match positions indices)
     unsigned int indices[] = {
         0, 1, 2,
         2, 3, 0
     };
 
+    // created a vertex array object
+    unsigned int vao;
+    GlCall(glGenVertexArrays(1, &vao));
+    GlCall(glBindVertexArray(vao));
+
+    // create a vertexBuffer to store our vertices
     unsigned int vertexBuffer;
     GlCall(glGenBuffers(1, &vertexBuffer));
     GlCall(glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer));
-    GlCall(glBufferData(GL_ARRAY_BUFFER, 6 * 2 * sizeof(float), positions, GL_STATIC_DRAW));
+    GlCall(glBufferData(GL_ARRAY_BUFFER, 4 * 2 * sizeof(float), positions, GL_STATIC_DRAW));
 
+    // BIND the vertex buffer to the vao so that now vao and vertex buffer are related and we can use vao to bind the
+    // vertices in our draw
     GlCall(glEnableVertexAttribArray(0));
     GlCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0));
 
+    // Create an index buffer that specify the index of which vertex we should be using to draw our triangles
     unsigned int indicesBuffer;
     GlCall(glGenBuffers(1, &indicesBuffer));
     GlCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indicesBuffer));
     GlCall(glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices, GL_STATIC_DRAW));
 
+    // Parse the Basic.shader file and gives une back a struct containing the Vertex shader and Fragment shader
     ShaderProgramSources source = ParseShader("res/shaders/Basic.shader");
 
+    // Create a program that compile and bind our vertex and fragment shader and then bind it to our state
     unsigned int shader = CreateShader(source.VertexSource, source.FragmentSource);
     GlCall(glUseProgram(shader));
 
+    // Create a uniform vector4f to set the color from c++
+    GlCall(int location = glGetUniformLocation(shader, "u_Color"));
+    ASSERT(location != -1);
+    GlCall(glUniform4f(location, 0.3f, 0.4f, 0.3f, 1.0f));
+
+    // reset the state
+    GlCall(glBindVertexArray(0));
+    GlCall(glUseProgram(0));
+    GlCall(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    GlCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
+    float r = 0.0f;
+    float increment = 0.05f;
+    
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
         /* Render here */
         GlCall(glClear(GL_COLOR_BUFFER_BIT));
 
+        // SET THE STATE
+        GlCall(glUseProgram(shader));
+        GlCall(glUniform4f(location, r, 0.4f, 0.3f, 1.0f));
+        
+        GlCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indicesBuffer));
 
+        GlCall(glBindVertexArray(vao));
         GlCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
 
+        if (r > 1.0f || r < 0.0f)
+        {
+            increment = -increment;
+        }
+
+        r += increment;
+        
         /* Swap front and back buffers */
         GlCall(glfwSwapBuffers(window));
 
