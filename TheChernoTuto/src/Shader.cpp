@@ -35,7 +35,7 @@ void Shader::Unbind() const
 void Shader::SetUniform4f(const std::string& name, float v0, float v1, float v2, float v3)
 {
     // Create a uniform vector4f to set the color from c++
-    GlCall(glUniform4f(GetUniformLocation(name), 0.3f, 0.4f, 0.3f, 1.0f));
+    GlCall(glUniform4f(GetUniformLocation(name), v0, v1, v2, v3));
 }
 
 unsigned int Shader::GetUniformLocation(const std::string& name)
