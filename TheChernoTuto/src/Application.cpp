@@ -7,6 +7,7 @@
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
 #include "Shader.h"
+#include "Texture.h"
 #include "VertexArray.h"
 #include "VertexBufferLayout.h"
 
@@ -45,10 +46,10 @@ int main(void)
     {
         // contain the list of vertices position as 2D coordinate
         float positions[] = {
-            -0.5f,  -0.5f,
-             0.5f,  -0.5f,
-             0.5f,   0.5f,
-            -0.5f,   0.5f,
+            -0.5f,  -0.5f,  0.0f,   0.0f,
+             0.5f,  -0.5f,  1.0f,   0.0f,
+             0.5f,   0.5f,  1.0f,   1.0f,
+            -0.5f,   0.5f,  0.0f,   1.0f
         };
 
         // Store which vertices we need to use to draw each triangle (3 per triangle and match positions indices)
@@ -57,11 +58,16 @@ int main(void)
             2, 3, 0
         };
 
+        GlCall(glEnable(GL_BLEND));
+        GlCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+
         VertexArray va;
-        VertexBuffer vb(positions, 4 * 2 * sizeof(float));
+        VertexBuffer vb(positions, 4 * 4 * sizeof(float));
 
         VertexBufferLayout layout;
         layout.Push<float>(2);
+        layout.Push<float>(2);
+
         va.AddBuffer(vb, layout);
 
         IndexBuffer ib(indices, 6);
@@ -69,13 +75,19 @@ int main(void)
 
         Shader shader("res/shaders/Basic.shader");
         shader.Bind();
-        shader.SetUniform4f("u_Color", 0.3f, 0.4f, 0.3f, 1.0f);
+        //shader.SetUniform4f("u_Color", 0.3f, 0.4f, 0.3f, 1.0f);
+
+        Texture texture("res/textures/proteccTerra.png");
+        texture.Bind(0);
+        shader.SetUniform1i("u_Texture", 0);
 
         // reset the state
         va.Unbind();
         shader.Unbind();
         vb.Unbind();
         ib.Unbind();
+        //texture.Unbind();
+
         //GlCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
         Renderer renderer;
@@ -92,7 +104,8 @@ int main(void)
             renderer.Clear();
 
             shader.Bind();
-            shader.SetUniform4f("u_Color", r, 0.4f, 0.3f, 1.0f);
+            //texture.Bind();
+            //shader.SetUniform4f("u_Color", r, 0.4f, 0.3f, 1.0f);
 
             renderer.Draw(va, ib, shader);
 
