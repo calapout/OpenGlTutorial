@@ -1,5 +1,5 @@
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
+#include "GL/glew.h"
+#include "GLFW/glfw3.h"
 
 #include <iostream>
 
@@ -10,11 +10,15 @@
 #include "Texture.h"
 #include "VertexArray.h"
 #include "VertexBufferLayout.h"
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
+
 
 int main(void)
 {
-    GLFWwindow* window;
-
     /* Initialize the library */
     if (!glfwInit())
         return -1;
@@ -25,7 +29,7 @@ int main(void)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1920, 1080, "Hello World", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -34,6 +38,7 @@ int main(void)
 
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
+    //VSYNC
     glfwSwapInterval(1);
     
     if (glewInit() != GLEW_OK)
@@ -45,11 +50,14 @@ int main(void)
 
     {
         // contain the list of vertices position as 2D coordinate
+        // The first two numbers are X and Y and the 2 next are U and V
+
+
         float positions[] = {
-            -0.5f,  -0.5f,  0.0f,   0.0f,
-             0.5f,  -0.5f,  1.0f,   0.0f,
-             0.5f,   0.5f,  1.0f,   1.0f,
-            -0.5f,   0.5f,  0.0f,   1.0f
+            -100.0f,     100.0f,    0.0f,   0.0f, // 0
+            -100.0f,    -100.0f,    1.0f,   0.0f, // 1
+             100.0f,    -100.0f,    1.0f,   1.0f, // 2
+             100.0f,     100.0f,    0.0f,   1.0f  // 3
         };
 
         // Store which vertices we need to use to draw each triangle (3 per triangle and match positions indices)
@@ -72,6 +80,8 @@ int main(void)
 
         IndexBuffer ib(indices, 6);
 
+        glm::mat4 proj = glm::ortho(0.0f, 1920.0f, 0.0f, 1080.0f, -1.0f, 1.0f);
+        glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, 0));
 
         Shader shader("res/shaders/Basic.shader");
         shader.Bind();
@@ -92,9 +102,27 @@ int main(void)
 
         Renderer renderer;
 
+        // SETUP IMGUI
+        ImGui::CreateContext();
+
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        io.Fonts->AddFontDefault();
+        io.Fonts->Build();
+
+        ImGui_ImplGlfw_InitForOpenGL(window, true);
+
+        ImGui_ImplOpenGL3_Init("#version 330");
+
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+
+        glm::vec3 translationA = glm::vec3(0, 0, 0);
+        glm::vec3 translationB = glm::vec3(0, 0, 0);
 
         float r = 0.0f;
         float increment = 0.05f;
+
+        static float f = 0.0f;
 
 
         /* Loop until the user closes the window */
@@ -103,11 +131,27 @@ int main(void)
             /* Render here */
             renderer.Clear();
 
-            shader.Bind();
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+
             //texture.Bind();
             //shader.SetUniform4f("u_Color", r, 0.4f, 0.3f, 1.0f);
+            shader.Bind();
+            {
+                glm::mat4 modelA = glm::translate(glm::mat4(1.0f), translationA);
+	            glm::mat4 MVP = proj * view * modelA;
+	            shader.SetUniformMat4f("u_MVP", MVP);
+	            renderer.Draw(va, ib, shader);
+            }
 
-            renderer.Draw(va, ib, shader);
+            {
+                glm::mat4 modelB = glm::translate(glm::mat4(1.0f), translationB);
+                glm::mat4 MVP = proj * view * modelB;
+                shader.SetUniformMat4f("u_MVP", MVP);
+                renderer.Draw(va, ib, shader);
+            }
 
             if (r > 1.0f || r < 0.0f)
             {
@@ -116,6 +160,18 @@ int main(void)
 
             r += increment;
 
+            {
+                ImGui::Begin("Debug");                          // Create a window called "Hello, world!" and append into it.
+                ImGui::SliderFloat3("floatA", &translationA.x, 0.0f, 960.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+                ImGui::SliderFloat3("floatB", &translationB.x, 0.0f, 960.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+                ImGui::End();
+            }
+
+            // Rendering
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
             /* Swap front and back buffers */
             GlCall(glfwSwapBuffers(window));
 
@@ -123,6 +179,10 @@ int main(void)
             GlCall(glfwPollEvents());
         }
     }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     glfwTerminate();
     return 0;
